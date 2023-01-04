@@ -3,6 +3,14 @@ from jira import JIRA
 import requests
 import json
 import pandas as pd
+from tkinter import *
+from tkinter import messagebox
+from tkinter import ttk
+import openpyxl
+BACKGROUND_COLOR = "#B1DDC6"
+JIRA_USERNAME = "Internal-EDG-SA-BulkDefects"
+
+
 def get_transition_id_by_name(jira: JIRA, issue, name: str):
     transitions = jira.transitions(issue)
     transition_list = [(t['id'], t['name']) for t in transitions]
@@ -51,29 +59,98 @@ def comment_cross_check_excel(jira:JIRA, issueID,excel_comment:str):
 def startConnection():
     '''Jira Server Connection'''
     jiraOptions = {'server': "https://jira-corelogic.valiantys.net"}
-    jira = JIRA(options=jiraOptions, basic_auth=("Internal-EDG-SA-BulkDefects", "iXyM*8W!s84&"))
+    jira = JIRA(options=jiraOptions, basic_auth=(JIRA_USERNAME, str(password_entry.get())))
     return jira
+def update_screen(label:Label, count:int, length:list):
+    label.config(text=f"{str(count)}/{str(len(length))}")
+    window.after(500, update_screen)
 
 
 # Press the green button in the gutter to run the script.
-if __name__ == '__main__':
+def upload_records():
+    if len(isc_entry.get()) == 0 or len(file_entry.get()) == 0 or len(username_entry.get()) == 0:
+        messagebox.showinfo(title="Oops", message="Please make sure you haven't left any fields empty.")
     jira= startConnection()
-    my_list = read_excel_file("Example.xlsx", [0,2,3,4])
-    for issue_info in my_list:
-        issue_id = issue_info[0]
-        issue = jira.issue(issue_id)
-        issue_status = issue_info[1]
-        issue_status_new = get_most_similar_issue_status_from_transition_name_list(jira,issue,issue_status)
-        issue_comment_tcs = issue_info[2]
-        issue_comment_onshore = issue_info[3]
-        bool_tcs_comment = comment_cross_check_excel(jira, issue_id, issue_comment_tcs)
-        bool_onshore_comment = comment_cross_check_excel(jira, issue_id, issue_comment_onshore)
-        if issue_status_new is not None:
-            set_issue_status_by_transition_name(jira,issue,issue_status_new)
-        if issue_comment_tcs is not None and bool_tcs_comment is False:
-            add_comment_to_an_issue(jira, issue_id, "(TCS) "+issue_comment_tcs)
-        if issue_comment_onshore is not None and bool_onshore_comment is False:
-            add_comment_to_an_issue(jira, issue_id, "(Onshore) "+issue_comment_onshore)
+    records_count = 1
+    try:
+        my_list = read_excel_file(rf"C:\Users\{str(isc_entry.get())}\OneDrive - CoreLogic Solutions, LLC\Desktop\{str(file_entry.get())}.xlsx", [0,2,3,4])
+    except PermissionError:
+        messagebox.showinfo(title="ERROR", message="Please save and exit the Excel File before proceeding")
+    else:
+        for issue_info in my_list:
+            issue_id = issue_info[0]
+            issue = jira.issue(issue_id)
+            issue_status = issue_info[1]
+            issue_status_new = get_most_similar_issue_status_from_transition_name_list(jira,issue,issue_status)
+            issue_comment_tcs = issue_info[2]
+            issue_comment_onshore = issue_info[3]
+            bool_tcs_comment = comment_cross_check_excel(jira, issue_id, excel_comment=f"(TCS) {issue_comment_tcs}")
+            bool_onshore_comment = comment_cross_check_excel(jira, issue_id, excel_comment=f"(Onshore) {issue_comment_onshore}")
+            print(bool_tcs_comment)
+            print(bool_onshore_comment)
+            if issue_status_new is not None:
+                set_issue_status_by_transition_name(jira,issue,issue_status_new)
+            if issue_comment_tcs is not None and bool_tcs_comment is False:
+                add_comment_to_an_issue(jira, issue_id, "(TCS) "+issue_comment_tcs)
+            if issue_comment_onshore is not None and bool_onshore_comment is False:
+                add_comment_to_an_issue(jira, issue_id, "(Onshore) "+issue_comment_onshore)
+            if records_count == len(my_list):
+                messagebox.showinfo(title="Success", message="All the files have been successfully uploaded")
+                progress_label.config(text=f"{records_count}/{len(my_list)}")
+            records_count += 1
+
+#-----------------------GUI---------------------
+window = Tk()
+window.title("JIRA-Uploader")
+window.config(padx=50, pady=50)
+canvas = Canvas(width=200, height=200)
+logo_img = PhotoImage(file="Safeimagekit-resized-img.png")
+canvas.create_image(100, 100, image=logo_img)
+canvas.grid(row=0, column=1)
+
+
+#Labels
+isc_label = Label(text="ISC:")
+isc_label.grid(row=1, column=0)
+file_label = Label(text="File Name:")
+file_label.grid(row=2, column=0)
+username_label = Label(text="Username for Jira:")
+username_label.grid(row=3, column=0)
+password_label = Label(text="Password for Jira:")
+password_label.grid(row=4, column=0)
+
+#Entries
+isc_entry = Entry(width=25)
+isc_entry.grid(row=1, column=1)
+file_entry = Entry(width=25)
+file_entry.grid(row=2, column=1)
+file_entry.focus()
+username_entry = Entry(width=35)
+username_entry.grid(row=3, column=1, columnspan=2)
+username_entry.insert(0, "Internal-EDG-SA-BulkDefects")
+password_entry = Entry(width=21,show="*")
+password_entry.grid(row=4, column=1)
+
+# Buttons
+add_button = Button(text="Update Status and Comment", width=36, command=upload_records)
+add_button.grid(row=5, column=1, columnspan=2)
+add_button.config(padx=10, pady=10)
+
+# #Progress Bar
+# prg1 = ttk.Progressbar(window,orient = HORIZONTAL,
+#         value=70,length = 300, mode = 'determinate')
+# prg1.grid(row=6, column=1, columnspan=2)
+progress_label = Label(text="Progress")
+progress_label.grid(row=6, column=1, columnspan=2)
+#-----------------------GUI---------------------
+window.mainloop()
+
+
+
+
+
+
+
 
     # add_comment_to_an_issue(jira,'ETQA-5897','My test Comment')
     # set_issue_status_by_transition_name(jira,issue,'Closed')
