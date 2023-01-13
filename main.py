@@ -1,4 +1,5 @@
 import difflib
+import os
 from jira import JIRA
 import requests
 import json
@@ -6,9 +7,20 @@ import pandas as pd
 from tkinter import *
 from tkinter import messagebox
 from tkinter import ttk
+import os
 import openpyxl
 BACKGROUND_COLOR = "#B1DDC6"
-JIRA_USERNAME = "Internal-EDG-SA-BulkDefects"
+JIRA_USERNAME = os.getenv("JIRA_USERNAME") #"Internal-EDG-SA-BulkDefects"
+JIRA_PASSWORD = os.getenv("JIRA_PASSWORD") #"iXyM*8W!s84&"
+records_count = 1
+window = Tk()
+
+#Progress Bar
+prg1 = ttk.Progressbar(window,orient = HORIZONTAL,
+        value=0,length = 300, mode = 'determinate')
+prg1.grid(row=7, column=1, columnspan=2)
+progress_label = Label(text="Progress")
+progress_label.grid(row=6, column=1, columnspan=2)
 
 
 def get_transition_id_by_name(jira: JIRA, issue, name: str):
@@ -19,10 +31,14 @@ def get_transition_id_by_name(jira: JIRA, issue, name: str):
     filtered_transition_list = list(transition_list_iterator)
     print(filtered_transition_list)
     return filtered_transition_list[0][0]
+
+
 def get_transition_name_list(jira:JIRA, issue):
     transitions = jira.transitions(issue)
     transition_list = [t['name'] for t in transitions]
     return transition_list
+
+
 def get_most_similar_issue_status_from_transition_name_list(jira:JIRA,issue,issue_status:str):
     if issue_status.lower() == 'fixesdone' or issue_status.lower() == 'fixes done':
         return 'Fixed'
@@ -31,15 +47,23 @@ def get_most_similar_issue_status_from_transition_name_list(jira:JIRA,issue,issu
     if len(most_similar_issue_status_list) > 0:
         return most_similar_issue_status_list[0]
     return 'Non-Issue'
+
+
 def set_issue_status_by_transition_name(jira:JIRA, issue, transition_name:str):
     transition_id=get_transition_id_by_name(jira,issue,transition_name)
     jira.transition_issue(issue, transition_id)
+
+
 def read_excel_file(file_name:str, require_cols:list):
     required_df= pd.read_excel(file_name, usecols=require_cols)
     return list(required_df.itertuples(index=False, name=None))
+
+
 def add_comment_to_an_issue(jira:JIRA, issueID, comment:str):
     myissue= jira.issue(issueID)
     jira.add_comment(myissue, comment)
+
+
 def get_comment_list_from_an_issue(jira:JIRA, issueID):
     '''Returns a list of comment bodies for the Jira ticket'''
     issue = jira.issue(issueID)
@@ -48,6 +72,8 @@ def get_comment_list_from_an_issue(jira:JIRA, issueID):
     for comment in comments1:
         comment_list.append(comment.body)
     return comment_list
+
+
 def comment_cross_check_excel(jira:JIRA, issueID,excel_comment:str):
     '''Returns true if the comment already exists in Jira'''
     comment_list= get_comment_list_from_an_issue(jira,issueID)
@@ -56,11 +82,15 @@ def comment_cross_check_excel(jira:JIRA, issueID,excel_comment:str):
             return True
             break
     return False
-def startConnection():
+
+
+def start_connection():
     '''Jira Server Connection'''
     jiraOptions = {'server': "https://jira-corelogic.valiantys.net"}
     jira = JIRA(options=jiraOptions, basic_auth=(JIRA_USERNAME, str(password_entry.get())))
     return jira
+
+
 def update_screen(label:Label, count:int, length:list):
     label.config(text=f"{str(count)}/{str(len(length))}")
     window.after(500, update_screen)
@@ -69,8 +99,11 @@ def update_screen(label:Label, count:int, length:list):
 # Press the green button in the gutter to run the script.
 def upload_records():
     if len(isc_entry.get()) == 0 or len(file_entry.get()) == 0 or len(username_entry.get()) == 0:
-        messagebox.showinfo(title="Oops", message="Please make sure you haven't left any fields empty.")
-    jira= startConnection()
+        messagebox.showinfo(title="Fill All The Fields", message="Please make sure you haven't left any fields empty.")
+    if password_entry.get() != JIRA_PASSWORD and len(password_entry.get()) != 0:
+        messagebox.showinfo(title="Password Error", message="Incorrect Password")
+    jira = start_connection()
+    global records_count
     records_count = 1
     try:
         my_list = read_excel_file(rf"C:\Users\{str(isc_entry.get())}\OneDrive - CoreLogic Solutions, LLC\Desktop\{str(file_entry.get())}.xlsx", [0,2,3,4])
@@ -94,13 +127,18 @@ def upload_records():
                 add_comment_to_an_issue(jira, issue_id, "(TCS) "+issue_comment_tcs)
             if issue_comment_onshore is not None and bool_onshore_comment is False:
                 add_comment_to_an_issue(jira, issue_id, "(Onshore) "+issue_comment_onshore)
-            if records_count == len(my_list):
-                messagebox.showinfo(title="Success", message="All the files have been successfully uploaded")
-                progress_label.config(text=f"{records_count}/{len(my_list)}")
+            progress_label.config(text=f"{records_count}/{len(my_list)}")
+            prg1.config(value=(100*records_count)/len(my_list))
             records_count += 1
+            window.update_idletasks()
+            if records_count == len(my_list)+1:
+                messagebox.showinfo(title="Success", message="All the files have been successfully uploaded")
 
-#-----------------------GUI---------------------
-window = Tk()
+
+
+#-----------------------GUI---------------------#
+
+
 window.title("JIRA-Uploader")
 window.config(padx=50, pady=50)
 canvas = Canvas(width=200, height=200)
@@ -122,26 +160,22 @@ password_label.grid(row=4, column=0)
 #Entries
 isc_entry = Entry(width=25)
 isc_entry.grid(row=1, column=1)
+isc_entry.focus()
 file_entry = Entry(width=25)
 file_entry.grid(row=2, column=1)
-file_entry.focus()
 username_entry = Entry(width=35)
 username_entry.grid(row=3, column=1, columnspan=2)
 username_entry.insert(0, "Internal-EDG-SA-BulkDefects")
+username_entry.config(state="disabled")
 password_entry = Entry(width=21,show="*")
 password_entry.grid(row=4, column=1)
 
 # Buttons
-add_button = Button(text="Update Status and Comment", width=36, command=upload_records)
+add_button = Button(text="Update Status and Comment", width=36, command=upload_records,bg="blue", fg="white")
 add_button.grid(row=5, column=1, columnspan=2)
-add_button.config(padx=10, pady=10)
+add_button.config(padx=5, pady=5)
 
-# #Progress Bar
-# prg1 = ttk.Progressbar(window,orient = HORIZONTAL,
-#         value=70,length = 300, mode = 'determinate')
-# prg1.grid(row=6, column=1, columnspan=2)
-progress_label = Label(text="Progress")
-progress_label.grid(row=6, column=1, columnspan=2)
+
 #-----------------------GUI---------------------
 window.mainloop()
 
