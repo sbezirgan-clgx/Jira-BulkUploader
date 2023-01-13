@@ -10,8 +10,8 @@ from tkinter import ttk
 import os
 import openpyxl
 BACKGROUND_COLOR = "#B1DDC6"
-JIRA_USERNAME = os.getenv("JIRA_USERNAME") #"Internal-EDG-SA-BulkDefects"
-JIRA_PASSWORD = os.getenv("JIRA_PASSWORD") #"iXyM*8W!s84&"
+JIRA_USERNAME = os.getenv("JIRA_USERNAME")
+JIRA_PASSWORD = os.getenv("JIRA_PASSWORD")
 records_count = 1
 window = Tk()
 
