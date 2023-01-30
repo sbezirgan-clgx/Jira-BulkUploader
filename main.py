@@ -40,10 +40,12 @@ def get_transition_name_list(jira:JIRA, issue):
 
 
 def get_most_similar_issue_status_from_transition_name_list(jira:JIRA,issue,issue_status:str):
-    if issue_status.lower() == 'fixesdone' or issue_status.lower() == 'fixes done':
+    if issue_status.lower() == 'fixesdone' or issue_status.lower() == 'fixes done' or issue_status.lower() == 'correction done' or issue_status.lower() == 'already corrected':
         return 'Fixed'
-    elif issue_status.lower() == 'transaction not found' or issue_status.lower() == 'image not found':
-        return 'Missing Info'
+    elif issue_status.lower() == 'transaction not found' or issue_status.lower() == 'field not found':
+        return 'Not in Scope'
+    elif issue_status.lower() == 'transaction deleted':
+        return 'Non-Issue'
     transition_name_list = get_transition_name_list(jira,issue)
     most_similar_issue_status_list = difflib.get_close_matches(issue_status, transition_name_list)
     if len(most_similar_issue_status_list) > 0:
@@ -108,34 +110,40 @@ def upload_records():
     global records_count
     records_count = 1
     try:
-        my_list = read_excel_file(rf"C:\Users\{str(isc_entry.get())}\OneDrive - CoreLogic Solutions, LLC\Desktop\{str(file_entry.get())}.xlsx", [0,2,3,4])
+        my_list = read_excel_file(rf"C:\Users\{str(isc_entry.get())}\OneDrive - CoreLogic Solutions, LLC\Desktop\{str(file_entry.get())}.xlsx", [0,1,2])
     except PermissionError:
         messagebox.showinfo(title="ERROR", message="Please save and exit the Excel File before proceeding")
     else:
         for issue_info in my_list:
-            issue_id = issue_info[0]
+            issue_id = issue_info[2]
             issue = jira.issue(issue_id)
-            issue_status = issue_info[1]
+            issue_status = issue_info[0]
             issue_status_new = get_most_similar_issue_status_from_transition_name_list(jira,issue,issue_status)
-            issue_comment_tcs = issue_info[2]
-            issue_comment_onshore = issue_info[3]
+            issue_comment_tcs = issue_info[1]
+            #issue_comment_onshore = issue_info[3]
             bool_tcs_comment = comment_cross_check_excel(jira, issue_id, excel_comment=f"(TCS) {issue_comment_tcs}")
-            bool_onshore_comment = comment_cross_check_excel(jira, issue_id, excel_comment=f"(Onshore) {issue_comment_onshore}")
+            #bool_onshore_comment = comment_cross_check_excel(jira, issue_id, excel_comment=f"(Onshore) {issue_comment_onshore}")
             print(bool_tcs_comment)
-            print(bool_onshore_comment)
+            #print(bool_onshore_comment)
             if issue_status_new is not None:
                 set_issue_status_by_transition_name(jira,issue,issue_status_new)
-            if issue_status_new == 'Missing Info':
-                if issue_status.lower() == 'transaction not found':
-                    issue_comment_tcs = issue_comment_tcs + f'({issue_status})'
+            if issue_status_new == 'Not in Scope':
+                if issue_status.lower() == 'field not found':
+                    issue_comment_tcs = 'Field not found in THOR.'
                     bool_tcs_comment = False
-                elif issue_status.lower() == 'image not found':
-                    issue_comment_tcs = issue_comment_tcs + f'({issue_status})'
+                elif issue_status.lower() == 'transaction not found':
+                    issue_comment_tcs = 'Transaction not found in THOR.'
                     bool_tcs_comment =False
+            if issue_status_new == 'Fixed':
+                issue_comment_tcs = 'Issue Fixed in THOR'
+                bool_tcs_comment = False
+            if issue_status_new == 'Non-Issue':
+                issue_comment_tcs = 'Transaction deleted in THOR.'
+                bool_tcs_comment = False
             if issue_comment_tcs is not None and bool_tcs_comment is False:
                 add_comment_to_an_issue(jira, issue_id, "(TCS) "+issue_comment_tcs)
-            if issue_comment_onshore is not None and bool_onshore_comment is False:
-                add_comment_to_an_issue(jira, issue_id, "(Onshore) "+issue_comment_onshore)
+            #if issue_comment_onshore is not None and bool_onshore_comment is False:
+                #add_comment_to_an_issue(jira, issue_id, "(Onshore) "+issue_comment_onshore)
             progress_label.config(text=f"{records_count}/{len(my_list)}")
             prg1.config(value=(100*records_count)/len(my_list))
             records_count += 1
