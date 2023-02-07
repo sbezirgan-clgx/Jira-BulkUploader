@@ -1,0 +1,9 @@
+Jira-BulkUploader
+
+This program is to be used to bulk upload the jira tickets status and comment section using Jira ticket key identifier.
+Excel file that shall be used has to be on the desktop of the user.
+It requires Jira credentials to run successfully.
+Order of the columns in excel files are crucial.Any changes to the orders of the columns in excel needs to be reported so that neccesary changes can be made.
+First column : TCS Status.
+Second column : TCS Comments
+Third Column : Key.
