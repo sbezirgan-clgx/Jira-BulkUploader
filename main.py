@@ -58,8 +58,8 @@ def set_issue_status_by_transition_name(jira:JIRA, issue, transition_name:str):
     jira.transition_issue(issue, transition_id)
 
 
-def read_excel_file(file_name:str, require_cols:list):
-    required_df= pd.read_excel(file_name, usecols=require_cols)
+def read_excel_file(file_name:str, require_cols:list,sheet_name:str):
+    required_df= pd.read_excel(file_name, usecols=require_cols,sheet_name=sheet_name)
     return list(required_df.itertuples(index=False, name=None))
 
 
@@ -110,12 +110,13 @@ def upload_records():
     global records_count
     records_count = 1
     try:
-        my_list = read_excel_file(rf"C:\Users\{str(isc_entry.get())}\OneDrive - CoreLogic Solutions, LLC\Desktop\{str(file_entry.get())}.xlsx", [0,1,2])
+        my_list = read_excel_file(rf"C:\Users\{str(isc_entry.get())}\OneDrive - CoreLogic Solutions, LLC\Desktop\{str(file_entry.get())}.xlsx", [0,1,2],sheet_name="Sheet1")
     except PermissionError:
         messagebox.showinfo(title="ERROR", message="Please save and exit the Excel File before proceeding")
     else:
         for issue_info in my_list:
             issue_id = issue_info[2]
+            print("This is issue id: "+issue_id)
             issue = jira.issue(issue_id)
             issue_status = issue_info[0]
             issue_status_new = get_most_similar_issue_status_from_transition_name_list(jira,issue,issue_status)
